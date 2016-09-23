@@ -32,7 +32,7 @@
       var isBlock = !!options.template.yield;
       // when used as a block
       if (isBlock) {
-        options.template.yield(params);
+        options.template.yield(params.slice());
       }
     });
   }
