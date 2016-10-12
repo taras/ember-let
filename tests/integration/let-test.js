@@ -6,6 +6,12 @@ import {
 } from 'ember-mocha';
 import hbs from 'htmlbars-inline-precompile';
 import emberVersionIs from 'ember-version-is';
+import Ember from 'ember';
+
+const {
+  assign,
+  create
+} = Object;
 
 describeComponent('let', 'Integration: let helper', { 
   integration: true 
@@ -49,6 +55,59 @@ describeComponent('let', 'Integration: let helper', {
 
       expect(this.$('.before').text()).to.eq('a b');
       expect(this.$('.after').text()).to.eq('A B ab');
+    });
+
+    it.only('supports components that recompute', function() {
+      let computeCount = 0;
+
+      this.register('helper:object', Ember.Helper.extend({
+        compute(params, options) {
+          computeCount++;
+          if (this.value) {
+            let value = this.value;
+            delete this.value;
+            return this.current = decorate(this, value);
+          } else {
+            return this.current = decorate(this, options);
+          }
+          
+          function decorate(helper, options) {
+            return assign(create({}, {
+              put: {
+                value: (key, value) => {
+                  helper.value = assign({}, helper.current, {[key]: value});
+                  helper.recompute();
+                }
+              }
+            }), options);
+          }
+        }
+      }));
+
+      this.render(hbs`
+        {{#let (object green="0B610B" red="FF0000") as |colors|}}
+          <ul>
+            {{#each-in colors as |name value|}}
+              <li class="spec-object-prop spec-object-prop-{{name}}">
+                <strong>{{name}}</strong>: <span class="spec-object-prop-value">{{value}}</span>
+                <button {{action colors.put name "FFFFFF"}}>Make white</button>
+              </li>
+            {{/each-in}}
+          </ul>
+        {{/let}}
+      `);
+
+      expect(computeCount).to.equal(1);
+      expect(this.$('.spec-object-prop').length).to.equal(2);
+      expect(this.$('.spec-object-prop-green .spec-object-prop-value').text()).to.equal('0B610B');
+      expect(this.$('.spec-object-prop-red .spec-object-prop-value').text()).to.equal('FF0000');
+
+      Ember.run(() => {
+        $('.spec-object-prop-green :contains(Make white)').click();
+      });
+
+      expect(computeCount).to.equal(2);
+      expect(this.$('.spec-object-prop-green .spec-object-prop-value').text()).to.equal('FFFFFF');
     });
   }
 );
