@@ -9,7 +9,10 @@ import emberVersionIs from 'ember-version-is';
 import Ember from 'ember';
 
 const {
-  assign,
+  merge
+} = Ember;
+
+const {
   create
 } = Object;
 
@@ -57,7 +60,7 @@ describeComponent('let', 'Integration: let helper', {
       expect(this.$('.after').text()).to.eq('A B ab');
     });
 
-    it.only('supports components that recompute', function() {
+    it('helpers that recompute', function() {
       let computeCount = 0;
 
       this.register('helper:object', Ember.Helper.extend({
@@ -72,10 +75,11 @@ describeComponent('let', 'Integration: let helper', {
           }
           
           function decorate(helper, options) {
-            return assign(create({}, {
+            return merge(create({}, {
               put: {
                 value: (key, value) => {
-                  helper.value = assign({}, helper.current, {[key]: value});
+                  let result = merge({}, helper.current);
+                  helper.value = merge(result, {[key]: value});
                   helper.recompute();
                 }
               }
