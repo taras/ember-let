@@ -62,7 +62,7 @@ describeComponent('let', 'Integration: let helper', {
       expect(this.$('.after').text()).to.eq('A B ab');
     });
 
-    describe.only('yield', function() {
+    describe('yield', function() {
       describe('helpers that recompute', function() {
         let computeCount;
 
@@ -99,6 +99,65 @@ describeComponent('let', 'Integration: let helper', {
               {{/each-in}}
               </ul>
             {{~/let~}}
+          `);
+
+        });
+
+        it('computes', function() {
+          expect(computeCount).to.equal(1);
+          expect(this.$('span').text()).to.equal('SilverSuburu');
+        });
+
+        describe('recompute', function() {
+          beforeEach(function() {
+            run(() => this.$('.prop-color button').click());
+          });
+
+          it('computes', function() {
+            expect(computeCount).to.equal(2);
+            expect(this.$('span').text()).to.equal('ChangedSuburu');
+          });
+        });
+      });
+    });
+
+    describe('with yield', function() {
+      describe('helpers that recompute', function() {
+        let computeCount;
+
+        beforeEach(function() {
+          computeCount = 0;
+          this.register('helper:car', Ember.Helper.extend({
+            compute(params, original) {
+              computeCount++;
+
+              let car = Object.create({}, {
+                put: {
+                  value: (key, value) => {
+                    this.changed = assign({}, original, this.changed , {
+                      [key]: value
+                    });
+                    this.recompute();
+                  },
+                  configurable: true
+                }
+              });
+
+              return assign(car, this.changed || original);
+            }
+          }));
+
+          this.render(hbs`
+            {{~#with (car color="Silver" make="Suburu") as |myCar|~}}
+              <ul>
+              {{#each-in myCar as |name value|}}
+                <li class="prop-{{name}}">
+                  <strong>{{name}}</strong>: <span>{{value}}</span>
+                  <button {{action myCar.put name "Changed"}}>Change</button>
+                </li>
+              {{/each-in}}
+              </ul>
+            {{~/with~}}
           `);
 
         });
