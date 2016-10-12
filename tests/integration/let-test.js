@@ -1,5 +1,9 @@
 /* jshint expr:true */
 import { expect } from 'chai';
+import { 
+  describe,
+  beforeEach
+  } from 'mocha';
 import {
   describeComponent,
   it
@@ -8,13 +12,11 @@ import hbs from 'htmlbars-inline-precompile';
 import emberVersionIs from 'ember-version-is';
 import Ember from 'ember';
 
-const {
-  merge
-} = Ember;
+import assign from '../helpers/assign';
 
 const {
-  create
-} = Object;
+  run
+} = Ember;
 
 describeComponent('let', 'Integration: let helper', { 
   integration: true 
@@ -60,58 +62,63 @@ describeComponent('let', 'Integration: let helper', {
       expect(this.$('.after').text()).to.eq('A B ab');
     });
 
-    it('helpers that recompute', function() {
-      let computeCount = 0;
+    describe.only('yield', function() {
+      describe('helpers that recompute', function() {
+        let computeCount;
 
-      this.register('helper:object', Ember.Helper.extend({
-        compute(params, options) {
-          computeCount++;
-          if (this.value) {
-            let value = this.value;
-            delete this.value;
-            return this.current = decorate(this, value);
-          } else {
-            return this.current = decorate(this, options);
-          }
-          
-          function decorate(helper, options) {
-            return merge(create({}, {
-              put: {
-                value: (key, value) => {
-                  let result = merge({}, helper.current);
-                  helper.value = merge(result, {[key]: value});
-                  helper.recompute();
+        beforeEach(function() {
+          computeCount = 0;
+          this.register('helper:car', Ember.Helper.extend({
+            compute(params, original) {
+              computeCount++;
+
+              let car = Object.create({}, {
+                put: {
+                  value: (key, value) => {
+                    this.changed = assign({}, original, this.changed , {
+                      [key]: value
+                    });
+                    this.recompute();
+                  },
+                  configurable: true
                 }
-              }
-            }), options);
-          }
-        }
-      }));
+              });
 
-      this.render(hbs`
-        {{#let (object green="0B610B" red="FF0000") as |colors|}}
-          <ul>
-            {{#each-in colors as |name value|}}
-              <li class="spec-object-prop spec-object-prop-{{name}}">
-                <strong>{{name}}</strong>: <span class="spec-object-prop-value">{{value}}</span>
-                <button {{action colors.put name "FFFFFF"}}>Make white</button>
-              </li>
-            {{/each-in}}
-          </ul>
-        {{/let}}
-      `);
+              return assign(car, this.changed || original);
+            }
+          }));
 
-      expect(computeCount).to.equal(1);
-      expect(this.$('.spec-object-prop').length).to.equal(2);
-      expect(this.$('.spec-object-prop-green .spec-object-prop-value').text()).to.equal('0B610B');
-      expect(this.$('.spec-object-prop-red .spec-object-prop-value').text()).to.equal('FF0000');
+          this.render(hbs`
+            {{~#let (car color="Silver" make="Suburu") as |myCar|~}}
+              <ul>
+              {{#each-in myCar as |name value|}}
+                <li class="prop-{{name}}">
+                  <strong>{{name}}</strong>: <span>{{value}}</span>
+                  <button {{action myCar.put name "Changed"}}>Change</button>
+                </li>
+              {{/each-in}}
+              </ul>
+            {{~/let~}}
+          `);
 
-      Ember.run(() => {
-        $('.spec-object-prop-green :contains(Make white)').click();
+        });
+
+        it('computes', function() {
+          expect(computeCount).to.equal(1);
+          expect(this.$('span').text()).to.equal('SilverSuburu');
+        });
+
+        describe('recompute', function() {
+          beforeEach(function() {
+            run(() => this.$('.prop-color button').click());
+          });
+
+          it('computes', function() {
+            expect(computeCount).to.equal(2);
+            expect(this.$('span').text()).to.equal('ChangedSuburu');
+          });
+        });
       });
-
-      expect(computeCount).to.equal(2);
-      expect(this.$('.spec-object-prop-green .spec-object-prop-value').text()).to.equal('FFFFFF');
     });
   }
 );
